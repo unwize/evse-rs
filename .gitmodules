@@ -1,3 +1,0 @@
-[submodule "src/ocpp-rs"]
-	path = src/ocpp-rs
-	url = https://github.com/unwize/ocpp-rs
