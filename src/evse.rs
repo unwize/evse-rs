@@ -1,8 +1,9 @@
-use miette::Result;
 use ocpp_rs::messages::boot_notification::BootNotificationRequest;
 use ocpp_rs::structures::charging_station_type::ChargingStationType;
 use ocpp_rs::structures::modem_type::ModemType;
 use ocpp_rs::traits::OcppEntity;
+
+use rootcause::prelude::*;
 
 #[derive(Debug, Default)]
 struct EVSEProperties {
@@ -46,13 +47,13 @@ impl Default for EVSE {
 
 impl EVSE {
     /// Send an OCPP message to the CSMS
-    pub async fn send_ocpp_message(&self, message: impl OcppEntity) -> Result<()> {
+    pub async fn send_ocpp_message(&self, message: impl OcppEntity) -> Result<(), Report> {
         // TODO: Implement
         Ok(())
     }
 
     /// Generate a boot notification
-    fn get_boot_notification(&self) -> Result<BootNotificationRequest> {
+    fn get_boot_notification(&self) -> Result<BootNotificationRequest, Report> {
         Ok(BootNotificationRequest {
             reason: Default::default(),
             charging_station: ChargingStationType {
@@ -83,7 +84,7 @@ impl EVSE {
     ///    transaction that was ongoing, the AvailabilityState should be Occupied.
     /// 6. Normal operation is resumed.
     /// 7. The Charging Station sends HeartbeatRequest to the CSMS.
-    pub async fn boot(&self) -> Result<()> {
+    pub async fn boot(&self) -> Result<(), Report> {
         // Generate BootNotificationRequest
         let message = self.get_boot_notification()?;
 
