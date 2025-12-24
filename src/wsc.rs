@@ -11,6 +11,7 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use rootcause::prelude::*;
 
 /// A basic client for sending and receiving messages. Owns the connection, input queue, and output queue.
+#[derive(Debug, Default)]
 pub struct WebsocketClient {
     pub address: String,
     tx_stream: Option<RwLock<SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>>>,

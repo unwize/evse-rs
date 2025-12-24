@@ -1,26 +1,30 @@
+use crate::wsc::WebsocketClient;
 use ocpp_rs::messages::boot_notification::BootNotificationRequest;
+use ocpp_rs::ocppj::RcpCall;
 use ocpp_rs::structures::charging_station_type::ChargingStationType;
 use ocpp_rs::structures::modem_type::ModemType;
-use ocpp_rs::traits::OcppEntity;
-
 use rootcause::prelude::*;
+use serde::Serialize;
+use tokio_tungstenite::tungstenite::{Message, Utf8Bytes};
+use uuid::Uuid;
 
 #[derive(Debug, Default)]
-struct EVSEProperties {
-    serial_number: String,
-    make: String,
-    model: String,
-    firmware_version: String,
-    modem: Option<ModemType>,
+pub struct EVSEProperties {
+    pub serial_number: String,
+    pub make: String,
+    pub model: String,
+    pub firmware_version: String,
+    pub modem: Option<ModemType>,
 }
 
 impl EVSEProperties {
-    fn new(
+    pub fn new(
         serial_number: String,
         make: String,
         model: String,
         firmware_version: String,
         modem: Option<ModemType>,
+        csms_endpoint: &str
     ) -> Self {
         Self {
             serial_number,
@@ -33,22 +37,55 @@ impl EVSEProperties {
 }
 
 #[derive(Debug)]
-pub struct EVSE {
-    properties: EVSEProperties,
+pub struct BaseEVSE {
+    pub properties: EVSEProperties,
+    pub websocket: WebsocketClient
 }
 
-impl Default for EVSE {
+impl Default for BaseEVSE {
     fn default() -> Self {
         Self {
             properties: EVSEProperties::default(),
+            websocket: WebsocketClient::default()
         }
     }
 }
 
-impl EVSE {
+impl BaseEVSE {
+
+    pub fn new(properties: EVSEProperties, csms_endpoint: &str) -> Self {
+        Self {
+            properties,
+            websocket: WebsocketClient::new(csms_endpoint),
+        }
+    }
+
+    pub async fn connect_websocket(&mut self) -> Result<(), Report> {
+        self.websocket.connect().await?;
+        Ok(())
+    }
+}
+
+impl Into<AliveEVSE> for BaseEVSE {
+    fn into(self) -> AliveEVSE {
+        AliveEVSE {
+            properties: self.properties,
+            websocket: self.websocket,
+        }
+    }
+}
+
+pub struct AliveEVSE {
+    pub properties: EVSEProperties,
+    pub websocket: WebsocketClient
+}
+
+impl AliveEVSE {
+
     /// Send an OCPP message to the CSMS
-    pub async fn send_ocpp_message(&self, message: impl OcppEntity) -> Result<(), Report> {
-        // TODO: Implement
+    pub async fn send_message(&mut self, message: impl Serialize + std::fmt::Debug) -> Result<(), Report> {
+        log::info!("Sending message: {:?}", serde_json::to_string(&message)?);
+        self.websocket.send(Message::Text(Utf8Bytes::from(serde_json::to_string(&message).context("Failed to serialize message to JSON")?))).await.context("Failed to send message")?;
         Ok(())
     }
 
@@ -66,12 +103,6 @@ impl EVSE {
         })
     }
 
-    pub fn new() -> Self {
-        Self {
-            properties: Default::default(),
-        }
-    }
-
     /// 1. The Charging Station is powered up.
     /// 2. The Charging Station sends BootNotificationRequest to the CSMS.
     /// 3. The CSMS returns with BootNotificationResponse with the status Accepted.
@@ -84,12 +115,13 @@ impl EVSE {
     ///    transaction that was ongoing, the AvailabilityState should be Occupied.
     /// 6. Normal operation is resumed.
     /// 7. The Charging Station sends HeartbeatRequest to the CSMS.
-    pub async fn boot(&self) -> Result<(), Report> {
+    pub async fn boot(&mut self) -> Result<(), Report> {
+        log::info!("Starting boot process");
         // Generate BootNotificationRequest
-        let message = self.get_boot_notification()?;
-
+        let bnf = self.get_boot_notification()?;
+        let message = RcpCall::new(Uuid::new_v4().simple().to_string().as_str(), Box::new(bnf));
         // Dispatch BNF
-        self.send_ocpp_message(message.clone()).await?;
+        self.send_message(message.clone()).await?;
 
         // Await BootNotificationResponse from CSMS
 

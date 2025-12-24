@@ -3,14 +3,16 @@ mod evse;
 mod evse_state;
 mod wsc;
 
-use ocpp_rs::messages::*;
+use crate::evse::{AliveEVSE, BaseEVSE, EVSEProperties};
 use rootcause::prelude::ResultExt;
-use crate::wsc::WebsocketClient;
 use rootcause::prelude::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Report>{
-    let mut wc = WebsocketClient::new("ws://127.0.0.1:8080");
-    wc.connect().await.context("Failed to connect to WebSocketServer")?;
+    colog::init();
+    let mut evse = BaseEVSE::new(EVSEProperties::default(), "ws://127.0.0.1:8000/evse/sim");
+    evse.connect_websocket().await.context("Failed to connect to WebSocketServer")?;
+    let mut alive_evse: AliveEVSE = evse.into();
+    alive_evse.boot().await?;
     loop {}
 }
