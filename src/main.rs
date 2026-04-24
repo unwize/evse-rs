@@ -10,7 +10,7 @@ use rootcause::prelude::*;
 #[tokio::main]
 async fn main() -> Result<(), Report>{
     colog::init();
-    let mut evse = BaseEVSE::new(EVSEProperties::default(), "ws://127.0.0.1:8000/evse/sim");
+    let mut evse = BaseEVSE::new(EVSEProperties::default(), "ws://localhost:8000/device/sim");
     evse.connect_websocket().await.context("Failed to connect to WebSocketServer")?;
     let mut alive_evse: AliveEVSE = evse.into();
     alive_evse.boot().await?;
