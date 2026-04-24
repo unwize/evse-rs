@@ -20,7 +20,7 @@ pub async fn start_ws_client(
     let (tx_outgoing, mut rx_outgoing) = mpsc::channel::<Message>(100);
     let (tx_incoming, rx_incoming) = mpsc::channel::<Message>(100);
 
-    // 1. Incoming Message Task (Reads from WS, pushes to Buffer)
+    // Incoming Message Task (Reads from WS, pushes to Buffer)
     tokio::spawn(async move {
         while let Some(Ok(msg)) = ws_read.next().await {
             // Push to the buffer. If the handler (receiver) drops, this loop breaks.
@@ -30,7 +30,7 @@ pub async fn start_ws_client(
         }
     });
 
-    // 2. Outgoing Message Task (Reads from Queue, writes to WS)
+    // Outgoing Message Task (Reads from Queue, writes to WS)
     tokio::spawn(async move {
         while let Some(msg) = rx_outgoing.recv().await {
             // Send to the WS. If the connection fails, this loop breaks.
@@ -60,6 +60,7 @@ impl WebsocketClient {
                 match msg {
                     Message::Text(text) => println!("Handler received: {}", text),
                     Message::Close(_) => println!("Connection closed"),
+                    Message::Ping(_) => println!("Ping"),
                     _ => {} // Handle binary, ping, pong, etc.
                 }
             }
@@ -70,7 +71,7 @@ impl WebsocketClient {
             tx
         })
     }
-    
+
     pub async fn send(&self, message: Message) -> Result<()> {
         self.tx.send(message).await?;
         Ok(())
